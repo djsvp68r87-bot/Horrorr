@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>3D Зомби Арена (Mobile)</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; background: #000; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    #ui { position: absolute; top: 15px; left: 15px; color: #fff; text-shadow: 2px 2px 4px #000; font-size: 16px; pointer-events: none; z-index: 5; }
+    #shop-btn { position: absolute; top: 15px; right: 15px; padding: 12px 18px; font-size: 15px; background: #ff9800; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    #shop { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,20,20,0.95); border: 2px solid #ff9800; color: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 340px; box-shadow: 0 0 20px rgba(0,0,0,0.8); z-index: 20; }
+    #shop h2 { margin-top: 0; text-align: center; color: #ff9800; font-size: 20px; }
+    .shop-item { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; border-bottom: 1px solid #444; padding-bottom: 8px; font-size: 14px; }
+    .shop-item button { padding: 8px 12px; background: #4caf50; border: none; color: white; cursor: pointer; border-radius: 4px; font-weight: bold; }
+    #joystick-base { position: absolute; width: 120px; height: 120px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; pointer-events: none; z-index: 5; display: none; }
+    #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.6); border-radius: 50%; pointer-events: none; }
+    #attack-btn { position: absolute; bottom: 50px; right: 40px; width: 90px; height: 90px; background: rgba(244,67,54,0.8); border: 3px solid #ffcdd2; border-radius: 50%; color: white; font-weight: bold; font-size: 16px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 5; cursor: pointer; }
+    #attack-btn:active { background: rgba(244,67,54,1); }
+    #weapon-bar { position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 5; }
+    .weapon-slot { padding: 8px 10px; background: rgba(0,0,0,0.6); border: 2px solid #555; color: white; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .weapon-slot.active { border-color: #ff9800; background: rgba(255,152,0,0.3); font-weight: bold; }
+    #auth-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 30; }
+    .auth-box { background: #222; padding: 25px; border-radius: 12px; text-align: center; color: white; border: 1px solid #555; width: 80%; max-width: 300px; }
+    .auth-box input { display: block; width: 90%; padding: 10px; margin: 15px auto; border-radius: 5px; border: 1px solid #444; background: #333; color: white; font-size: 16px; text-align: center; }
+    .auth-box button { padding: 12px 25px; background: #2196f3; border: none; color: white; font-size: 16px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 100%; }
+    #toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; z-index: 40; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    #toast.show { opacity: 1; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h2>🧟 Зомби Арена</h2>
+      <p style="font-size: 14px; color: #aaa;">Безопасный вход по почте</p>
+      <input type="email" id="user-email" placeholder="email@domain.com" value="player@mail.ru">
+      <button onclick="startGame()">Войти в игру</button>
+    </div>
+  </div>
+
+  <div id="ui">
+    💰 Монеты: <span id="coins">0</span><br>
+    ❤️ Здоровье: <span id="hp">100</span>
+  </div>
+  <button id="shop-btn" onclick="toggleShop()">🛒 Магазин</button>
+
+  <div id="weapon-bar">
+    <div class="weapon-slot active" id="slot-hammer"   onclick="setWeapon('hammer')">🔨</div>
+    <div class="weapon-slot"        id="slot-petard"   onclick="setWeapon('petard')">🧨</div>
+    <div class="weapon-slot"        id="slot-firework" onclick="setWeapon('firework')">🎆</div>
+  </div>
+
+  <div id="joystick-base"><div id="joystick-stick"></div></div>
+  <div id="attack-btn">АТАКА</div>
+
+  <div id="shop">
+    <h2>Улучшения</h2>
+    <div class="shop-item">
+      <div><strong>Молоток</strong><br><small>Ур. <span id="hammer-lvl">1</span></small></div>
+      <button onclick="buyUpgrade('hammer')">100 💰</button>
+    </div>
+    <div class="shop-item">
+      <div><strong>Петарда</strong><br><small>Ур. <span id="petard-lvl">1</span></small></div>
+      <button onclick="buyUpgrade('petard')">150 💰</button>
+    </div>
+    <div class="shop-item">
+      <div><strong>Фейерверк</strong><br><small>Ур. <span id="firework-lvl">1</span></small></div>
+      <button onclick="buyUpgrade('firework')">250 💰</button>
+    </div>
+    <button onclick="toggleShop()" style="width:100%;padding:10px;margin-top:15px;background:#f44336;border:none;color:white;border-radius:4px;font-weight:bold;">Закрыть</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let scene, camera, renderer, clock;
+    let coins = 0, hp = 100;
+    let zombies = [];
+    let currentWeapon = 'hammer';
+    let upgrades = { hammer: 1, petard: 1, firework: 1 };
+    let isShopOpen = false;
+    let spawnTimer = null;
+    let gameRunning = false;
+    let moveVector = { x: 0, z: 0 };
+    let isJoystickActive = false;
+    let joystickTouchId = null;
+    let joyOriginX = 0, joyOriginY = 0;
+    let lookTouchId = null;
+    let lastTouchX = 0;
+    let cameraRotationY = 0;
+    const _forward = new THREE.Vector3();
+    const _side    = new THREE.Vector3();
+    const _dir     = new THREE.Vector3();
+    const GEO = {
+      head: new THREE.BoxGeometry(1, 1, 1),
+      body: new THREE.BoxGeometry(1, 1, 1),
+      arm:  new THREE.BoxGeometry(1, 1, 1),
+      leg:  new THREE.BoxGeometry(1, 1, 1)
+    };
+    const MAT = {
+      skinNormal:  new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 }),
+      skinMutant:  new THREE.MeshStandardMaterial({ color: 0xb71c1c, roughness: 0.6 }),
+      clothNormal: new THREE.MeshStandardMaterial({ color: 0x1565c0, roughness: 0.7 }),
+      clothMutant: new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: 0.7 })
+    };
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.innerText = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
+    }
+    function startGame() {
+      const email = document.getElementById('user-email').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast('Введите корректный email');
+        return;
+      }
+      document.getElementById('auth-overlay').style.display = 'none';
+      init();
+      gameRunning = true;
+      animate();
+    }
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+      scene.fog = new THREE.FogExp2(0x1a1a2e, 0.03);
+      camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 200);
+      camera.position.set(0, 1.8, 0);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(20, 40, 20);
+      scene.add(dirLight);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      document.body.appendChild(renderer.domElement);
+      const floorGeo = new THREE.PlaneGeometry(60, 60);
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.8 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      scene.add(floor);
+      const grid = new THREE.GridHelper(60, 30, 0xff9800, 0x555555);
+      grid.position.y = 0.01;
+      scene.add(grid);
+      clock = new THREE.Clock();
+      spawnTimer = setInterval(spawnZombie, 3000);
+      setupMobileControls();
+      window.addEventListener('resize', onWindowResize);
+    }
+    function createVoxelMob(isMutant) {
+      const group = new THREE.Group();
+      const s = isMutant ? 1.5 : 1.0;
+      const skinMat  = isMutant ? MAT.skinMutant  : MAT.skinNormal;
+      const clothMat = isMutant ? MAT.clothMutant : MAT.clothNormal;
+      const head = new THREE.Mesh(GEO.head, skinMat);
+      head.scale.set(0.7 * s, 0.7 * s, 0.7 * s);
+      head.position.y = 1.6 * s;
+      group.add(head);
+      const body = new THREE.Mesh(GEO.body, clothMat);
+      body.scale.set(0.8 * s, 0.9 * s, 0.4 * s);
+      body.position.y = 0.95 * s;
+      group.add(body);
+      const leftArm = new THREE.Mesh(GEO.arm, skinMat);
+      leftArm.scale.set(0.3 * s, 0.8 * s, 0.3 * s);
+      leftArm.position.set(-0.55 * s, 1.0 * s, -0.2 * s);
+      leftArm.rotation.x = -Math.PI / 2;
+      group.add(leftArm);
+      const rightArm = new THREE.Mesh(GEO.arm, skinMat);
+      rightArm.scale.set(0.3 * s, 0.8 * s, 0.3 * s);
+      rightArm.position.set(0.55 * s, 1.0 * s, -0.2 * s);
+      rightArm.rotation.x = -Math.PI / 2;
+      group.add(rightArm);
+      const leftLeg = new THREE.Mesh(GEO.leg, clothMat);
+      leftLeg.scale.set(0.35 * s, 0.8 * s, 0.35 * s);
+      leftLeg.position.set(-0.2 * s, 0.4 * s, 0);
+      group.add(leftLeg);
+      const rightLeg = new THREE.Mesh(GEO.leg, clothMat);
+      rightLeg.scale.set(0.35 * s, 0.8 * s, 0.35 * s);
+      rightLeg.position.set(0.2 * s, 0.4 * s, 0);
+      group.add(rightLeg);
+      group.userData.leftLeg  = leftLeg;
+      group.userData.rightLeg = rightLeg;
+      group.userData.leftArm  = leftArm;
+      group.userData.rightArm = rightArm;
+      return group;
+    }
+    function spawnZombie() {
+      if (!gameRunning || isShopOpen || zombies.length >= 12) return;
+      const isMutant = Math.random() < 0.25;
+      const mobGroup = createVoxelMob(isMutant);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 20 + Math.random() * 5;
+      let sx = camera.position.x + Math.cos(angle) * dist;
+      let sz = camera.position.z + Math.sin(angle) * dist;
+      sx = Math.max(-28, Math.min(28, sx));
+      sz = Math.max(-28, Math.min(28, sz));
+      mobGroup.position.set(sx, 0, sz);
+      scene.add(mobGroup);
+      zombies.push({
+        mesh: mobGroup,
+        isMutant,
+        hp: isMutant ? 250 : 80,
+        reward: isMutant ? 100 : 50,
+        flying: false,
+        flyVelocity: 0,
+        phase: Math.random() * Math.PI * 2,
+        lastAttack: 0
+      });
+    }
+    function setupMobileControls() {
+      const base = document.getElementById('joystick-base');
+      const stick = document.getElementById('joystick-stick');
+      const maxDist = 40;
+      window.addEventListener('touchstart', (e) => {
+        for (const t of e.changedTouches) {
+          if (t.clientX < innerWidth / 2 && !isJoystickActive) {
+            isJoystickActive = true;
+            joystickTouchId = t.identifier;
+            joyOriginX = t.clientX;
+            joyOriginY = t.clientY;
+            base.style.left = (t.clientX - 60) + 'px';
+            base.style.top  = (t.clientY - 60) + 'px';
+            base.style.bottom = 'auto';
+            base.style.display = 'block';
+            stick.style.transform = 'translate(0px, 0px)';
+          } else if (t.clientX >= innerWidth / 2 && lookTouchId === null) {
+            lookTouchId = t.identifier;
+            lastTouchX = t.clientX;
+          }
+        }
+      }, { passive: false });
+      window.addEventListener('touchmove', (e) => {
+        if (isJoystickActive || lookTouchId !== null) e.preventDefault();
+        for (const t of e.changedTouches) {
+          if (isJoystickActive && t.identifier === joystickTouchId) {
+            const dx = t.clientX - joyOriginX;
+            const dy = t.clientY - joyOriginY;
+            const dist = Math.min(Math.hypot(dx, dy), maxDist);
+            const angle = Math.atan2(dy, dx);
+            stick.style.transform =
+              `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
+            const nx = Math.cos(angle) * (dist / maxDist);
+            const nz = -Math.sin(angle) * (dist / maxDist);
+            moveVector.x = Math.abs(nx) < 0.15 ? 0 : nx;
+            moveVector.z = Math.abs(nz) < 0.15 ? 0 : nz;
+          } else if (lookTouchId !== null && t.identifier === lookTouchId) {
+            const deltaX = t.clientX - lastTouchX;
+            cameraRotationY -= deltaX * 0.005;
+            lastTouchX = t.clientX;
+          }
+        }
+      }, { passive: false });
+      window.addEventListener('touchend', (e) => {
+        for (const t of e.changedTouches) {
+          if (isJoystickActive && t.identifier === joystickTouchId) {
+            isJoystickActive = false;
+            joystickTouchId = null;
+            base.style.display = 'none';
+            stick.style.transform = 'translate(0px, 0px)';
+            moveVector.x = 0;
+            moveVector.z = 0;
+          }
+          if (lookTouchId !== null && t.identifier === lookTouchId) {
+            lookTouchId = null;
+          }
+        }
+      });
+      const attackBtn = document.getElementById('attack-btn');
+      attackBtn.addEventListener('touchstart', (e) => { e.preventDefault(); attack(); });
+      attackBtn.addEventListener('mousedown', attack);
+      window.addEventListener('keydown', (e) => { if (e.code === 'Space') attack(); });
+    }
+    function setWeapon(w) {
+      currentWeapon = w;
+      document.querySelectorAll('.weapon-slot').forEach(el => el.classList.remove('active'));
+      document.getElementById(`slot-${w}`).classList.add('active');
+    }
+    function attack() {
+      if (isShopOpen || !gameRunning) return;
+      for (const z of zombies) {
+        const distSq = z.mesh.position.distanceToSquared(camera.position);
+        if (currentWeapon === 'hammer'   && distSq < 25) {
+          z.hp -= 40 * upgrades.hammer;
+          _dir.copy(z.mesh.position).sub(camera.position).setY(0).normalize();
+          z.mesh.position.addScaledVector(_dir, 2.5);
+        } else if (currentWeapon === 'petard' && distSq < 81 * upgrades.petard) {
+          z.hp -= 60;
+        } else if (currentWeapon === 'firework' && distSq < 144) {
+          z.flying = true;
+          z.flyVelocity = 0.35 * upgrades.firework;
+        }
+      }
+      checkZombieDeaths();
+    }
+    function disposeZombie(z) {
+      scene.remove(z.mesh);
+    }
+    function checkZombieDeaths() {
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        if (zombies[i].hp <= 0) {
+          coins += zombies[i].reward;
+          document.getElementById('coins').innerText = coins;
+          disposeZombie(zombies[i]);
+          zombies.splice(i, 1);
+        }
+      }
+    }
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const f  = dt * 60;
+      if (!isShopOpen && gameRunning) {
+        _forward.set(-Math.sin(cameraRotationY), 0, -Math.cos(cameraRotationY));
+        _side.set(Math.cos(cameraRotationY), 0, -Math.sin(cameraRotationY));
+        const speed = 0.07 * f;
+        camera.position.addScaledVector(_forward, moveVector.z * speed);
+        camera.position.addScaledVector(_side,    moveVector.x * speed);
+        camera.position.x = Math.max(-28, Math.min(28, camera.position.x));
+        camera.position.z = Math.max(-28, Math.min(28, camera.position.z));
+        camera.rotation.y = cameraRotationY;
+        const now = performance.now() / 1000;
+        let deaths = false;
+        for (const z of zombies) {
+          if (z.flying) {
+            z.mesh.position.y += z.flyVelocity * f;
+            z.flyVelocity -= 0.012 * f;
+            if (z.mesh.position.y <= 0) {
+              z.mesh.position.y = 0;
+              z.flying = false;
+              z.hp -= 50;
+              deaths = true;
+            }
+          } else {
+            _dir.copy(camera.position).sub(z.mesh.position).setY(0);
+            const d = _dir.length();
+            _dir.normalize();
+            z.mesh.position.addScaledVector(_dir, (z.isMutant ? 0.035 : 0.028) * f);
+            z.mesh.lookAt(camera.position.x, z.mesh.position.y, camera.position.z);
+            z.phase += dt * 4;
+            const swing = Math.sin(z.phase) * 0.4;
+            z.mesh.userData.leftLeg.rotation.x  =  swing;
+            z.mesh.userData.rightLeg.rotation.x = -swing;
+            if (d < 1.5 && now - z.lastAttack > 1) {
+              z.lastAttack = now;
+              hp = Math.max(0, hp - (z.isMutant ? 15 : 8));
+              document.getElementById('hp').innerText = hp;
+              if (hp <= 0) gameOver();
+            }
+          }
+        }
+        if (deaths) checkZombieDeaths();
+      }
+      renderer.render(scene, camera);
+    }
+    function gameOver() {
+      gameRunning = false;
+      if (spawnTimer) clearInterval(spawnTimer);
+      showToast('💀 Вы погибли!');
+      setTimeout(() => {
+        for (const z of zombies) disposeZombie(z);
+        zombies.length = 0;
+        hp = 100;
+        document.getElementById('hp').innerText = hp;
+        camera.position.set(0, 1.8, 0);
+        cameraRotationY = 0;
+        gameRunning = true;
+        spawnTimer = setInterval(spawnZombie, 3000);
+      }, 2000);
+    }
+    function toggleShop() {
+      isShopOpen = !isShopOpen;
+      document.getElementById('shop').style.display = isShopOpen ? 'block' : 'none';
+      isJoystickActive = false;
+      joystickTouchId = null;
+      moveVector.x = 0; moveVector.z = 0;
+      document.getElementById('joystick-base').style.display = 'none';
+    }
+    function buyUpgrade(type) {
+      const prices = { hammer: 100, petard: 150, firework: 250 };
+      if (coins < prices[type]) {
+        showToast('Недостаточно монет!');
+        return;
+      }
+      coins -= prices[type];
+      upgrades[type]++;
+      document.getElementById('coins').innerText = coins;
+      document.getElementById(`${type}-lvl`).innerText = upgrades[type];
+    }
+    function onWindowResize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    }
+  </script>
+</body>
+</html>
